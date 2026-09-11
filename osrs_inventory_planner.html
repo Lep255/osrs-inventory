@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>OSRS Inventory Planner</title>
+<style>
+  :root{
+    --bg:#11100d;
+    --panel:#2a241b;
+    --panel2:#17140f;
+    --gold:#d6b56d;
+    --gold2:#8d713c;
+    --text:#f2ead7;
+    --muted:#aaa08d;
+    --slot:#3a3329;
+    --slot2:#211d17;
+    --danger:#9b3d31;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    min-height:100vh;
+    font-family:Arial,Helvetica,sans-serif;
+    background:
+      radial-gradient(circle at top,#2b2419 0,#15120e 40%,#0b0a08 100%);
+    color:var(--text);
+  }
+  .app{
+    width:min(920px,100%);
+    margin:0 auto;
+    padding:18px;
+    display:grid;
+    grid-template-columns:minmax(300px,390px) minmax(300px,1fr);
+    gap:18px;
+  }
+  .panel{
+    background:linear-gradient(#30291f,#1a1712);
+    border:1px solid #5a4a31;
+    border-radius:12px;
+    box-shadow:0 14px 40px #0008,inset 0 1px #ffffff0d;
+  }
+  .inventory-panel{padding:16px}
+  .title{
+    margin:0 0 12px;
+    font-size:20px;
+    color:#f4d88d;
+    text-align:center;
+    letter-spacing:.5px;
+  }
+  .inventory{
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    gap:8px;
+    padding:12px;
+    background:#13110d;
+    border:2px solid #66573d;
+    box-shadow:inset 0 0 18px #000;
+    border-radius:8px;
+    aspect-ratio:4/7;
+  }
+  .slot{
+    position:relative;
+    min-width:0;
+    min-height:0;
+    border:1px solid #5d5241;
+    border-radius:5px;
+    background:
+      linear-gradient(145deg,#494034,#2a251e 45%,#201c16);
+    box-shadow:
+      inset 1px 1px 1px #ffffff12,
+      inset -2px -2px 4px #0008;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    user-select:none;
+  }
+  .slot.drag-over{
+    outline:2px solid #e2c069;
+    outline-offset:-2px;
+    filter:brightness(1.18);
+  }
+  .item{
+    width:100%;
+    height:100%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    cursor:grab;
+    position:relative;
+    padding:4px;
+  }
+  .item:active{cursor:grabbing}
+  .item img{
+    max-width:88%;
+    max-height:88%;
+    object-fit:contain;
+    image-rendering:auto;
+    pointer-events:none;
+    filter:drop-shadow(1px 2px 1px #000a);
+  }
+  .fallback-icon{
+    width:76%;
+    height:76%;
+    display:grid;
+    place-items:center;
+    text-align:center;
+    padding:4px;
+    border-radius:50%;
+    background:#8f733d;
+    color:#160f05;
+    font-weight:800;
+    font-size:11px;
+    line-height:1.05;
+    overflow:hidden;
+    pointer-events:none;
+  }
+  .item-name{
+    position:absolute;
+    left:2px;right:2px;bottom:1px;
+    background:#000b;
+    color:#fff4cc;
+    font-size:9px;
+    text-align:center;
+    border-radius:3px;
+    padding:1px 2px;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    pointer-events:none;
+    opacity:0;
+    transition:.12s;
+  }
+  .slot:hover .item-name{opacity:1}
+  .slot-number{
+    position:absolute;
+    top:2px;left:4px;
+    color:#ffffff24;
+    font-size:9px;
+    pointer-events:none;
+  }
+  .toolbar{
+    display:flex;
+    gap:8px;
+    margin-top:12px;
+  }
+  button{
+    border:1px solid #806b45;
+    background:linear-gradient(#4f432f,#2c261d);
+    color:#f3e5bb;
+    padding:9px 11px;
+    border-radius:7px;
+    font-weight:700;
+    cursor:pointer;
+  }
+  button:hover{filter:brightness(1.13)}
+  button.danger{border-color:#81443a;color:#ffd9d2}
+  .count{
+    margin-top:10px;
+    text-align:center;
+    color:var(--muted);
+    font-size:13px;
+  }
+
+  .search-panel{padding:16px;min-height:470px}
+  .search-row{display:flex;gap:8px}
+  input{
+    width:100%;
+    border:1px solid #6c5b3e;
+    background:#100e0b;
+    color:#f8efd9;
+    border-radius:7px;
+    padding:11px 12px;
+    outline:none;
+  }
+  input:focus{border-color:#c4a65e;box-shadow:0 0 0 2px #c4a65e22}
+  .hint{
+    color:#9e9586;
+    font-size:12px;
+    margin:9px 0 12px;
+    line-height:1.35;
+  }
+  .status{
+    color:#c9b98f;
+    font-size:12px;
+    min-height:18px;
+    margin-bottom:8px;
+  }
+  .results{
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:8px;
+  }
+  .result{
+    min-width:0;
+    display:flex;
+    gap:9px;
+    align-items:center;
+    padding:8px;
+    border:1px solid #514633;
+    border-radius:7px;
+    background:#1b1812;
+    cursor:pointer;
+  }
+  .result:hover{border-color:#ae9154;background:#252016}
+  .result img,.result .mini-fallback{
+    width:42px;height:42px;
+    object-fit:contain;
+    flex:0 0 42px;
+  }
+  .mini-fallback{
+    border-radius:50%;
+    display:grid;
+    place-items:center;
+    background:#806837;
+    color:#170f05;
+    font-size:9px;
+    font-weight:800;
+    text-align:center;
+    padding:3px;
+  }
+  .result-name{
+    min-width:0;
+    font-size:13px;
+    color:#f0dfb4;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .result-sub{
+    font-size:10px;
+    color:#8f8678;
+    margin-top:3px;
+  }
+  .footer-note{
+    margin-top:12px;
+    color:#847a6a;
+    font-size:11px;
+    text-align:center;
+  }
+  @media(max-width:720px){
+    .app{grid-template-columns:1fr;padding:10px}
+    .inventory-panel{max-width:420px;width:100%;margin:0 auto}
+    .results{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <section class="panel inventory-panel">
+    <h1 class="title">Inventory Planner</h1>
+    <div id="inventory" class="inventory"></div>
+    <div class="toolbar">
+      <button id="undoBtn">Undo</button>
+      <button id="clearBtn" class="danger">Clear All</button>
+    </div>
+    <div id="count" class="count">0 / 28 slots used</div>
+  </section>
+
+  <section class="panel search-panel">
+    <h2 class="title" style="text-align:left">Add Item</h2>
+    <div class="search-row">
+      <input id="searchInput" autocomplete="off" placeholder="Search OSRS items… e.g. Abyssal whip" />
+      <button id="searchBtn">Search</button>
+    </div>
+    <div class="hint">
+      Click a result to add it to the first empty slot. Drag items between slots.
+      Dropping onto an occupied slot swaps the two items. Double-click an inventory item to remove it.
+    </div>
+    <div id="status" class="status"></div>
+    <div id="results" class="results"></div>
+    <div class="footer-note">Item search uses the Old School RuneScape Wiki API when available.</div>
+  </section>
+</div>
+
+<script>
+(() => {
+  const SLOT_COUNT = 28;
+  const API = 'https://oldschool.runescape.wiki/api.php';
+  const STORAGE_KEY = 'osrs_inventory_planner_v1';
+
+  const inventoryEl = document.getElementById('inventory');
+  const countEl = document.getElementById('count');
+  const resultsEl = document.getElementById('results');
+  const statusEl = document.getElementById('status');
+  const searchInput = document.getElementById('searchInput');
+
+  let slots = Array(SLOT_COUNT).fill(null);
+  let history = [];
+  let dragIndex = null;
+
+  function snapshot() {
+    history.push(JSON.stringify(slots));
+    if (history.length > 30) history.shift();
+  }
+
+  function save() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(slots));
+  }
+
+  function load() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+      if (Array.isArray(saved) && saved.length === SLOT_COUNT) slots = saved;
+    } catch {}
+  }
+
+  function escapeHtml(s='') {
+    return s.replace(/[&<>"']/g, c => ({
+      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'
+    })[c]);
+  }
+
+  function initials(name) {
+    return name.split(/\s+/).slice(0,2).map(x => x[0] || '').join('').toUpperCase();
+  }
+
+  function render() {
+    inventoryEl.innerHTML = '';
+    slots.forEach((item, i) => {
+      const slot = document.createElement('div');
+      slot.className = 'slot';
+      slot.dataset.index = i;
+      slot.innerHTML = `<span class="slot-number">${i + 1}</span>`;
+
+      slot.addEventListener('dragover', e => {
+        e.preventDefault();
+        slot.classList.add('drag-over');
+      });
+      slot.addEventListener('dragleave', () => slot.classList.remove('drag-over'));
+      slot.addEventListener('drop', e => {
+        e.preventDefault();
+        slot.classList.remove('drag-over');
+        if (dragIndex === null || dragIndex === i) return;
+        snapshot();
+        [slots[dragIndex], slots[i]] = [slots[i], slots[dragIndex]];
+        dragIndex = null;
+        save();
+        render();
+      });
+
+      if (item) {
+        const wrap = document.createElement('div');
+        wrap.className = 'item';
+        wrap.draggable = true;
+        wrap.title = `${item.name}\nDrag to move/swap • Double-click to remove`;
+
+        wrap.addEventListener('dragstart', e => {
+          dragIndex = i;
+          e.dataTransfer.effectAllowed = 'move';
+          try { e.dataTransfer.setData('text/plain', String(i)); } catch {}
+        });
+        wrap.addEventListener('dragend', () => {
+          dragIndex = null;
+          document.querySelectorAll('.slot.drag-over').forEach(x => x.classList.remove('drag-over'));
+        });
+        wrap.addEventListener('dblclick', () => {
+          snapshot();
+          slots[i] = null;
+          save();
+          render();
+        });
+
+        if (item.image) {
+          const img = document.createElement('img');
+          img.src = item.image;
+          img.alt = item.name;
+          img.onerror = () => {
+            img.replaceWith(makeFallback(item.name, 'fallback-icon'));
+          };
+          wrap.appendChild(img);
+        } else {
+          wrap.appendChild(makeFallback(item.name, 'fallback-icon'));
+        }
+
+        const label = document.createElement('div');
+        label.className = 'item-name';
+        label.textContent = item.name;
+        wrap.appendChild(label);
+        slot.appendChild(wrap);
+      }
+
+      inventoryEl.appendChild(slot);
+    });
+    countEl.textContent = `${slots.filter(Boolean).length} / ${SLOT_COUNT} slots used`;
+  }
+
+  function makeFallback(name, cls) {
+    const el = document.createElement('div');
+    el.className = cls;
+    el.textContent = initials(name);
+    return el;
+  }
+
+  function addItem(item) {
+    const empty = slots.findIndex(x => !x);
+    if (empty === -1) {
+      statusEl.textContent = 'Inventory is full — 28 / 28 slots used.';
+      return;
+    }
+    snapshot();
+    slots[empty] = item;
+    save();
+    render();
+    statusEl.textContent = `${item.name} added to slot ${empty + 1}.`;
+  }
+
+  async function wikiSearch(term) {
+    // Search page titles, then request thumbnails in one API call.
+    const searchUrl = new URL(API);
+    searchUrl.search = new URLSearchParams({
+      action:'query',
+      list:'search',
+      srsearch: term,
+      srnamespace:'0',
+      srlimit:'12',
+      format:'json',
+      origin:'*'
+    });
+
+    const res = await fetch(searchUrl);
+    if (!res.ok) throw new Error('Search request failed');
+    const data = await res.json();
+    const names = (data.query?.search || []).map(x => x.title).slice(0,12);
+    if (!names.length) return [];
+
+    const imageUrl = new URL(API);
+    imageUrl.search = new URLSearchParams({
+      action:'query',
+      prop:'pageimages',
+      piprop:'thumbnail',
+      pithumbsize:'96',
+      titles:names.join('|'),
+      format:'json',
+      origin:'*'
+    });
+
+    const res2 = await fetch(imageUrl);
+    if (!res2.ok) throw new Error('Image request failed');
+    const data2 = await res2.json();
+    const pages = Object.values(data2.query?.pages || {});
+    const imgMap = new Map(pages.map(p => [p.title, p.thumbnail?.source || null]));
+
+    return names.map(name => ({
+      name,
+      image: imgMap.get(name) || null
+    }));
+  }
+
+  function renderResults(items) {
+    resultsEl.innerHTML = '';
+    if (!items.length) {
+      statusEl.textContent = 'No matching items found.';
+      return;
+    }
+    statusEl.textContent = `Found ${items.length} result${items.length === 1 ? '' : 's'}. Click one to add it.`;
+
+    items.forEach(item => {
+      const card = document.createElement('div');
+      card.className = 'result';
+      card.title = `Add ${item.name}`;
+
+      const media = document.createElement('div');
+      if (item.image) {
+        const img = document.createElement('img');
+        img.src = item.image;
+        img.alt = item.name;
+        img.onerror = () => img.replaceWith(makeFallback(item.name, 'mini-fallback'));
+        media.appendChild(img);
+      } else {
+        media.appendChild(makeFallback(item.name, 'mini-fallback'));
+      }
+
+      const text = document.createElement('div');
+      text.style.minWidth = '0';
+      text.innerHTML = `
+        <div class="result-name">${escapeHtml(item.name)}</div>
+        <div class="result-sub">Click to add</div>
+      `;
+
+      card.append(media, text);
+      card.addEventListener('click', () => addItem(item));
+      resultsEl.appendChild(card);
+    });
+  }
+
+  async function doSearch() {
+    const term = searchInput.value.trim();
+    if (!term) return;
+    statusEl.textContent = 'Searching…';
+    resultsEl.innerHTML = '';
+
+    try {
+      const items = await wikiSearch(term);
+      renderResults(items);
+    } catch (err) {
+      // Graceful manual fallback if the wiki blocks direct browser requests.
+      statusEl.textContent = 'Wiki search could not be reached. You can still add the typed name below.';
+      renderResults([{name: term, image: null}]);
+    }
+  }
+
+  document.getElementById('searchBtn').addEventListener('click', doSearch);
+  searchInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter') doSearch();
+  });
+
+  document.getElementById('clearBtn').addEventListener('click', () => {
+    if (!slots.some(Boolean)) return;
+    snapshot();
+    slots = Array(SLOT_COUNT).fill(null);
+    save();
+    render();
+    statusEl.textContent = 'Inventory cleared.';
+  });
+
+  document.getElementById('undoBtn').addEventListener('click', () => {
+    if (!history.length) {
+      statusEl.textContent = 'Nothing to undo.';
+      return;
+    }
+    try {
+      slots = JSON.parse(history.pop());
+      save();
+      render();
+      statusEl.textContent = 'Last change undone.';
+    } catch {}
+  });
+
+  load();
+  render();
+})();
+</script>
+</body>
+</html>
